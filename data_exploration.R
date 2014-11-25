@@ -6,3 +6,5 @@ points <- readOGR("../GIS","Kayak_UM_MSU_2014")
 
 #Hello group mates!!
 
+#hahaha
+
