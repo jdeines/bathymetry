@@ -1,0 +1,22 @@
+---
+title: "Interpolation Grid and IDW"
+author: "Jill Deines"
+date: "Thursday, December 04, 2014"
+output: html_document
+---
+
+```{r knitrOpts, echo=FALSE}
+library(knitr)
+opts_chunk$set(cache=TRUE)
+opts_chunk$set(echo=TRUE)
+opts_chunk$set(fig.path='figure/IDW/')
+opts_chunk$set(cache.path='cache/IDW/')
+```
+
+**R Packages Needed*
+
+```{r packages, message=FALSE, echo=TRUE}
+library(rgdal)
+library(gstat)
+```
+
