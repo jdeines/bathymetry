@@ -76,7 +76,9 @@ writeOGR(allpoints,"../GIS","All_PointsWithShoreline", driver= "ESRI Shapefile")
 # try it on full dataset
 vario <- variogram(lakedepth ~ 1, allpoints)
 plot(vario, col='black', main="Omnidirectional Variogram for All Data")
-
+vgm <- vgm(model="Sph", nugget=0, psill=220, range=3000)
+vgm <- fit.variogram(vario,vgm)
+plot(vario, model=vgm, main= "Omnidirectional Variogram for All Data")
 
 # Randomly select points
 
