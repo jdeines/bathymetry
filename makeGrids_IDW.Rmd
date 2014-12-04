@@ -9,8 +9,10 @@ output: html_document
 library(knitr)
 opts_chunk$set(cache=TRUE)
 opts_chunk$set(echo=TRUE)
-opts_chunk$set(fig.path='figure/IDW/')
+opts_chunk$set(fig.path='figures/IDW/')
 opts_chunk$set(cache.path='cache/IDW/')
+
+setwd("S:/Projects/2013/Higgins_Lake/Higgins_Bath/KrigingProject")
 ```
 
 **R Packages Needed*
@@ -18,5 +20,75 @@ opts_chunk$set(cache.path='cache/IDW/')
 ```{r packages, message=FALSE, echo=TRUE}
 library(rgdal)
 library(gstat)
+```
+
+## Make Interpolation Grids
+Interpolation methods in `gstat` require a spatialPixelsDataFrame grid to interpolate to. Because we aren't sure which resolution will have feasible processing times, we are making 3 grids with the following resolutions:
+
+* 1 meter 
+* 3 meters
+* 10 meters
+
+For now, I'm in charge of the 1 meter grid.
+
+### Preparation: create a lake polygon with donut hole
+In order to have our interpolation grid match the lake/island shores precisely, a polygon may be the best bet. Here, I create polygons from the shore points. In ArcGIS, I split the shore points into 1 island shore points file (IslandBorderPoints_utm.shp) and 1 lake shore points shapefile ('ShoreBorderPoitns_utm').
+
+http://stackoverflow.com/questions/21977720/r-finding-closest-neighboring-point-and-number-of-neighbors-within-a-given-rad
+
+```{r lakePolys}
+library(rgeos)
+# load lake shore points
+polyDir <- 'S:/Projects/2013/Higgins_Lake/Higgins_Bath/GIS/lakePolys'
+shorepoints <- readOGR(polyDir,'ShoreBorderPoints_utm', verbose=F)
+
+# simply building polygon doesn't work because the points are out of order
+sp_poly <- SpatialPolygons(list(Polygons(list(Polygon(shorepoints)), ID=1)))
+plot(sp_poly)
+
+# perform a Graham scan to reorder points --------------------------------------
+# get projected coords and find further south point
+shorepoints$utm.x <- coordinates(shorepoints)[,'coords.x1']
+shorepoints$utm.y <- coordinates(shorepoints)[,'coords.x2']
+shorepoints$Id <- 1:length(shorepoints$Id)
+refPoint <- shorepoints[shorepoints$utm.y == min(shorepoints$utm.y),'Id']
+
+# calculate pairwise distances for all points
+pairDists <- gDistance(shorepoints, byid=T)
+
+# starting at refPoint, find the next closest point to make a new index
+# start at second point so while loop works..
+clockOrder <- c(refPoint$Id, 1179)  # output sorting vector 
+index <- 1179       # set starting index
+
+# go through points until back at the beginning
+while(index != 1180) {
+  distances <- pairDists[index,] # get row for this point from distance matrix
+  nextpoint <- as.numeric(names(sort(distances)[2])) # get ID for closest point
+  while (nextpoint %in% clockOrder) {
+    j <- 3
+    nextpoint <- as.numeric(names(sort(distances)[j]))
+    j <- j + 1
+  }
+  clockOrder <- c(clockOrder, nextpoint)             # add to sorting vector
+  clockOrder[clockOrder == 1180] <- NA
+  index <- nextpoint
+}
+
+#ch <- chull(coordinates(shorepoints))
+#foo <- shorepoints[c(ch, ch[1]),]
+
+
+
+
+```
+
+
+```{r makeGrid}
+# load full point dataset (with shoreline points)
+gisDir <- 'S:/Projects/2013/Higgins_Lake/Higgins_Bath/GIS'
+points <- readOGR(gisDir,"All_PointsWithShoreline", verbose=F)
+
+grid <- as(spsample(startingHeads, 50000, type = "regular"), "SpatialPixels")
 ```
 
