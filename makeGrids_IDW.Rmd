@@ -2,7 +2,9 @@
 title: "Interpolation Grid and IDW"
 author: "Jill Deines"
 date: "Thursday, December 04, 2014"
-output: html_document
+output: 
+  html_document:
+    toc: yes
 ---
 
 ```{r knitrOpts, echo=FALSE}
@@ -213,3 +215,22 @@ save(grid3m, file=paste0(rdataDir,'Grid3m.RData'))
 ```
 
 ## Make an IDW Baseline
+
+```{r IDW}
+# load grid
+rdataDir <- 'S:/Projects/2013/Higgins_Lake/Higgins_Bath/KrigingProject/Higgins_Code/RData_Objects/'
+load(paste0(rdataDir,'Grid10m.RData'))
+
+# load points
+gisDir <- 'S:/Projects/2013/Higgins_Lake/Higgins_Bath/GIS'
+allpoints <- readOGR(gisDir,"All_PointsWithShoreline", verbose=F)
+
+# IDW: k = 2, npts = 8
+idw10m <- idw(lakedepth ~ 1, allpoints, newdata = grid10m, 
+                  idp = 2, nmax = 8)
+
+lakePal <- colorRampPalette(c('midnightblue','turquoise1'))
+spplot(idw10m, 'var1.pred', col.regions = rev(lakePal(200)),
+       main = 'IDW: k = 2, npts = 8')
+```
+
