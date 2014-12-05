@@ -11,8 +11,6 @@ opts_chunk$set(cache=TRUE)
 opts_chunk$set(echo=TRUE)
 opts_chunk$set(fig.path='figures/IDW/')
 opts_chunk$set(cache.path='cache/IDW/')
-
-setwd("S:/Projects/2013/Higgins_Lake/Higgins_Bath/KrigingProject")
 ```
 
 **R Packages Needed*
@@ -20,6 +18,7 @@ setwd("S:/Projects/2013/Higgins_Lake/Higgins_Bath/KrigingProject")
 ```{r packages, message=FALSE, echo=TRUE}
 library(rgdal)
 library(gstat)
+library(rgeos)
 ```
 
 ## Make Interpolation Grids
@@ -32,18 +31,17 @@ Interpolation methods in `gstat` require a spatialPixelsDataFrame grid to interp
 For now, I'm in charge of the 1 meter grid.
 
 ### Preparation: create a lake polygon with donut hole
-In order to have our interpolation grid match the lake/island shores precisely, a polygon may be the best bet. Here, I create polygons from the shore points. In ArcGIS, I split the shore points into 1 island shore points file (IslandBorderPoints_utm.shp) and 1 lake shore points shapefile ('ShoreBorderPoitns_utm').
+In order to have our interpolation grid match the lake/island shores precisely, a polygon may be the best bet. Here, I create polygons from the shore points. In ArcGIS, I split the shore points into 1 island shore points file (IslandBorderPoints_utm.shp) and 1 lake shore points shapefile ('ShoreBorderPoitns_utm'). I turn the points into polygons below, with code that is wee bit hacky so that the points are ordered correctly to make one polygon.
 
-http://stackoverflow.com/questions/21977720/r-finding-closest-neighboring-point-and-number-of-neighbors-within-a-given-rad
 
-```{r lakePolys}
-library(rgeos)
+```{r lakePolysOuter}
 # load lake shore points
 polyDir <- 'S:/Projects/2013/Higgins_Lake/Higgins_Bath/GIS/lakePolys'
 shorepoints <- readOGR(polyDir,'ShoreBorderPoints_utm', verbose=F)
 
 # simply building polygon doesn't work because the points are out of order
 sp_poly <- SpatialPolygons(list(Polygons(list(Polygon(shorepoints)), ID=1)))
+par(mar=c(.5,.5,.5,.5))
 plot(sp_poly)
 
 # perform a Graham scan to reorder points --------------------------------------
@@ -65,26 +63,106 @@ index <- 1179       # set starting index
 while(index != 1180) {
   distances <- pairDists[index,] # get row for this point from distance matrix
   nextpoint <- as.numeric(names(sort(distances)[2])) # get ID for closest point
+  j <- 3
   while (nextpoint %in% clockOrder) {
-    j <- 3
     nextpoint <- as.numeric(names(sort(distances)[j]))
     j <- j + 1
   }
+  # this cuts out a few corners. Manually override nextpoint
+  if (index == 1095) nextpoint <- 1094    
+  if (index == 1913) nextpoint <- 1914 
+  if (index == 1914) nextpoint <- 1915 
+  if (index == 1915) nextpoint <- 1945
+  if (index == 1945) nextpoint <- 1916
+  if (index == 1916) nextpoint <- 1921
+  if (index == 1921) nextpoint <- 1922
   clockOrder <- c(clockOrder, nextpoint)             # add to sorting vector
   clockOrder[clockOrder == 1180] <- NA
   index <- nextpoint
 }
 
-#ch <- chull(coordinates(shorepoints))
-#foo <- shorepoints[c(ch, ch[1]),]
+# add in 1180
+clockOrder <- clockOrder[1:(length(clockOrder)-1)]
+clockOrder[is.na(clockOrder)] <- 1180
 
+# subset points for ones in clockOrder, and sort by clockOrder
+shore2 <- shorepoints[shorepoints$Id %in% clockOrder,]
+shore2 <- shore2[match(clockOrder, shore2$Id),]
 
+# now make a polygon -----------------------------------------------------------
+poly <- SpatialPolygons(list(Polygons(list(Polygon(shore2)), ID=1)))
+poly <- SpatialPolygonsDataFrame(poly, data=data.frame(ID=1))
+proj4string(poly) <- proj4string(shorepoints)
+par(mar=c(.5,.5,.5,.5))
+plot(shorepoints, col='red', cex=.5)
+plot(poly, add=T)
 
-
+# writeOGR(poly, polyDir,'ShorePoly_noIsland_utm', driver = 'ESRI Shapefile')
 ```
 
+Awesome, now let's do the island.
 
-```{r makeGrid}
+```{r lakePolysInner}
+# load lake shore points
+polyDir <- 'S:/Projects/2013/Higgins_Lake/Higgins_Bath/GIS/lakePolys'
+islandpoints <- readOGR(polyDir,'IslandBorderPoints_utm', verbose=F)
+
+# simply building polygon doesn't work because the points are out of order
+ipoly <- SpatialPolygons(list(Polygons(list(Polygon(islandpoints)), ID=1)))
+par(mar=c(.5,.5,.5,.5))
+plot(ipoly)
+
+# perform a Graham scan to reorder points --------------------------------------
+# get projected coords and find further south point
+islandpoints$utm.x <- coordinates(islandpoints)[,'coords.x1']
+islandpoints$utm.y <- coordinates(islandpoints)[,'coords.x2']
+islandpoints$Id <- 1:length(islandpoints$Id)
+refPoint <- islandpoints[islandpoints$utm.y == min(islandpoints$utm.y),'Id']
+
+# calculate pairwise distances for all points
+pairDists <- gDistance(islandpoints, byid=T)
+
+# starting at refPoint, find the next closest point to make a new index
+# start at second point so while loop works..
+nextpoint1 <- as.numeric(names(sort(pairDists[refPoint$Id,])[2]))
+clockOrder <- c(refPoint$Id, nextpoint1)  # output sorting vector 
+index <- nextpoint1       # set starting index
+
+# go through points until back at the beginning
+while(index != refPoint$Id) {
+  distances <- pairDists[index,] # get row for this point from distance matrix
+  nextpoint <- as.numeric(names(sort(distances)[2])) # get ID for closest point
+  j <- 3
+  while (nextpoint %in% clockOrder) {
+    nextpoint <- as.numeric(names(sort(distances)[j]))
+    j <- j + 1
+  }
+  # this cuts out a few corners. Manually override nextpoint 
+  clockOrder <- c(clockOrder, nextpoint)             # add to sorting vector
+  clockOrder[clockOrder == refPoint$Id] <- NA
+  index <- nextpoint
+}
+
+# add in 1180
+clockOrder <- clockOrder[1:(length(clockOrder)-1)]
+clockOrder[is.na(clockOrder)] <- refPoint$Id
+
+# subset points for ones in clockOrder, and sort by clockOrder
+#shore2 <- shorepoints[shorepoints$Id %in% clockOrder,]
+island <- islandpoints[match(clockOrder, islandpoints$Id),]
+
+# now make a polygon -----------------------------------------------------------
+polyis <- SpatialPolygons(list(Polygons(list(Polygon(island)), ID=1)))
+polyis <- SpatialPolygonsDataFrame(polyis, data=data.frame(ID=1))
+proj4string(polyis) <- proj4string(islandpoints)
+par(mar=c(.5,.5,.5,.5))
+plot(islandpoints, col='red', cex=.5)
+plot(polyis, add=T)
+
+# writeOGR(polyis, polyDir,'IslandPoly_utm', driver = 'ESRI Shapefile')
+```
+
+```{r makeGrid, eval=FALSE}
 # load full point dataset (with shoreline points)
 gisDir <- 'S:/Projects/2013/Higgins_Lake/Higgins_Bath/GIS'
 points <- readOGR(gisDir,"All_PointsWithShoreline", verbose=F)
