@@ -74,11 +74,51 @@ writeOGR(allpoints,"../GIS","All_PointsWithShoreline", driver= "ESRI Shapefile")
 
 # variogram -----------------------------------------------------------------------
 # try it on full dataset
-vario <- variogram(lakedepth ~ 1, allpoints)
-plot(vario, col='black', main="Omnidirectional Variogram for All Data")
-vgm <- vgm(model="Sph", nugget=0, psill=220, range=3000)
-vgm <- fit.variogram(vario,vgm)
-plot(vario, model=vgm, main= "Omnidirectional Variogram for All Data")
+# fit variogram
+vario <- variogram(lakedepth ~ 1, points)
+plot(vario, col='black', main="Omnidirectional Variogram for Data No Shoreline")
+vgm.no_shore <- vgm(model="Sph", nugget=0, psill=220, range=3000)
+vgm.no_shore <- fit.variogram(vario,vgm.no_shore)
+# make plot
+png('figures/vario_points_no shoreline.png', type = "cairo", units = "in", width = 4.5, height = 4, res = 300)
+plot(vario, model=vgm.no_shore, main= "Omnidirectional Variogram \n for Data No Shoreline")
+dev.off()
 
-# Randomly select points
+# Randomly select 5000 points
+Index_5000 <- round(runif(5000, min=1, max=564951))
+points_5000 <- points[Index_5000,]
+# fit variogram
+vario_5000 <- variogram(lakedepth ~ 1, points_5000)
+plot(vario_5000, col='black', main="Omnidirectional Variogram for 5000 points No Shoreline")
+vgm.5000 <- vgm(model="Sph", nugget=0, psill=120, range=2)
+vgm.5000 <- fit.variogram(vario_5000,vgm.5000)
+# make plot
+png('figures/variogram5000.png', type = "cairo", units = "in", width = 4.5, height = 4, res = 300)
+plot(vario_5000, model=vgm.5000, main= "Omnidirectional Variogram for \n 5000 Points Without Shoreline")
+dev.off()
 
+# Randomly select 10000 points
+Index_10000 <- round(runif(10000, min=1, max=564951))
+points_10000 <- points[Index_10000,]
+# fit variogram
+vario_10000 <- variogram(lakedepth ~ 1, points_10000)
+plot(vario_10000, col='black', main="Omnidirectional Variogram for 10000 points No Shoreline")
+vgm.10000 <- vgm(model="Sph", nugget=0, psill=120, range=2)
+vgm.10000 <- fit.variogram(vario_10000,vgm.10000)
+# make plot
+png('figures/variogram10000.png', type = "cairo", units = "in", width = 4.5, height = 4, res = 300)
+plot(vario_10000, model=vgm.10000, main= "Omnidirectional Variogram for \n 10000 Points Without Shoreline")
+dev.off()
+
+# Randomly select 50000 points
+Index_50000 <- round(runif(50000, min=1, max=564951))
+points_50000 <- points[Index_50000,]
+# fit variogram
+vario_50000 <- variogram(lakedepth ~ 1, points_50000)
+plot(vario_50000, col='black', main="Omnidirectional Variogram for 50000 points No Shoreline")
+vgm.50000 <- vgm(model="Sph", nugget=0, psill=120, range=2)
+vgm.50000 <- fit.variogram(vario_50000,vgm.50000)
+# make plot
+png('figures/variogram50000.png', type = "cairo", units = "in", width = 4.5, height = 4, res = 300)
+plot(vario_50000, model=vgm.50000, main= "Omnidirectional Variogram for \n 50000 Points Without Shoreline")
+dev.off()
