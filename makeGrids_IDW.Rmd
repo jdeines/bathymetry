@@ -162,11 +162,54 @@ plot(polyis, add=T)
 # writeOGR(polyis, polyDir,'IslandPoly_utm', driver = 'ESRI Shapefile')
 ```
 
-```{r makeGrid, eval=FALSE}
-# load full point dataset (with shoreline points)
-gisDir <- 'S:/Projects/2013/Higgins_Lake/Higgins_Bath/GIS'
-points <- readOGR(gisDir,"All_PointsWithShoreline", verbose=F)
+I then used the island polygon to make a hole in the lake polygon in ArcGIS 10.2 by:
 
-grid <- as(spsample(startingHeads, 50000, type = "regular"), "SpatialPixels")
+* creating a copy of the full lake polygon (will become the output) and opened this and the island polygon in ArcMap
+* selecting the inner island polygon
+* starting an Editing session, and selecting Clip on the Editor dropdown
+* Set the buffer distance to 0 and choose to discard the area that intersects
+* save edits. yay!
+
+### Use this lake polygon to establish a grid
+
+This uses Ashton Shortridge's custom function for making a SpatialPixelsDataFrame from a polygon:
+
+```{r spinPolyGrid}
+# build.SpinPolyGrid
+# A function that constructs a SpatialPixelsDataFrame for a grid of points
+# within the boundaries of a (multi) SpatialPolygons object.
+# poly is the SpatialPolygons object, gridres is the spatial resolution of each
+# pixel, and coordNames is a vector of names for the resulting coordinates.
+# Returns a SpatialPixelsDataFrame.
+build.SpinPolyGrid <- function(poly, gridres=1000, coordNames = c('x', 'y')) {
+    library(sp)
+    grid.df <- makegrid(poly, cellsize=gridres)
+    names(grid.df) <- coordNames
+    grid.df$id <- 1:length(grid.df[,1])  # an ID column.
+    coordinates(grid.df) <- coordNames # convert to a SpatialPoints Object
+    grid.df@proj4string <- poly@proj4string # If there's coord system info, set that.
+    class(poly) <- "SpatialPolygons"
+    grid.pts <- grid.df[!is.na(over(grid.df, poly)),]
+    return(as(grid.pts, "SpatialPixelsDataFrame")) # Cast to SpatialPixelsDataFrame
+
+}
 ```
 
+Make grids and save as RData
+
+```{r makeGrid, eval=FALSE}
+# load lake polygon with island hole
+polyDir <- 'S:/Projects/2013/Higgins_Lake/Higgins_Bath/GIS/lakePolys'
+lakepoly <- readOGR(polyDir,'FinalLakePoly', verbose=F)
+
+grid10m <- build.SpinPolyGrid(lakepoly, gridres=10)
+grid5m <- build.SpinPolyGrid(lakepoly, gridres=5)
+grid3m <- build.SpinPolyGrid(lakepoly, gridres=3)
+
+rdataDir <- 'S:/Projects/2013/Higgins_Lake/Higgins_Bath/KrigingProject/Higgins_Code/RData_Objects/'
+save(grid10m, file=paste0(rdataDir,'Grid10m.RData'))
+save(grid5m, file=paste0(rdataDir,'Grid5m.RData'))
+save(grid3m, file=paste0(rdataDir,'Grid3m.RData'))
+```
+
+## Make an IDW Baseline
