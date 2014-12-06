@@ -8,12 +8,10 @@ library(gstat)
 library(maptools)
 
 
-
 # Load Data and Plot------------------------------------------------------------
-points <- readOGR("../GIS","Kayak_UM_MSU_2014")
-
-# make lake depth (m) using elevation of shoreline
-points$lakedepth <- 351.733 - points$Bot_Ele
+# all depth points (sonar, shoal, kayak), cleaned and projected
+points <- readOGR("../GIS/cleanData_duplicatesRemoved",
+                  "Kayak_UM_MSU_2014_noDupes_utm")
 
 # histogram of bottom elevation
 hist(points$lakedepth, main='Histogram of Lake Depth (m)', 
@@ -47,28 +45,9 @@ grid.text('Lake Depth (m)',x=unit(0.965, "npc"),y=unit(0.5, 'npc'), rot=-90)
 #dev.off()
 
 
-#Add shoreline points-------------------------------------------------------------
-shorepoints <- readOGR("../GIS","Shoreline_Points_GCS")
-names(shorepoints)
-names(points)
-proj4string(shorepoints)
-proj4string(points)
-
-# match column names between shore points and data points
-shorepoints <- shorepoints[,c('Lat','Lon','Bot_Ele','Id')]
-newnames <- c('Lat','Lon','Bot_Ele','ID')
-names(shorepoints) <- newnames
-
-#add shore depth and combine shoreline to points
-shorepoints$lakedepth <- 0
-allpoints <- spRbind(points, shorepoints)
-
-# reproject to meters
-utmproj <- '+proj=utm +zone=16 +ellps=GRS80 +datum=NAD83 +units=m +no_defs' 
-allpoints <- spTransform(allpoints, CRS(utmproj))
-
-# write out Shapefile
-writeOGR(allpoints,"../GIS","All_PointsWithShoreline", driver= "ESRI Shapefile")
+#Load data with shoreline points------------------------------------------------
+shorepoints <- readOGR("../GIS/cleanData_duplicatesRemoved",
+                       "AllPoints_withShoreline_utm")
 
 
 
