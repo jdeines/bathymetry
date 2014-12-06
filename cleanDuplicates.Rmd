@@ -36,7 +36,7 @@ library(maptools)
 ## Main depth point dataset
 Here, I go to town on 'Kayak_UM_MSU_2014.shp'. Note I also create the `lakedepth` field here.
 
-```{r mainPoints, message=FALSE}
+```{r mainPoints, message=FALSE, eval=FALSE}
 # load points
 gisDir <- 'S:/Projects/2013/Higgins_Lake/Higgins_Bath/GIS'
 points <- readOGR(gisDir,"Kayak_UM_MSU_2014", verbose=F)
@@ -82,59 +82,182 @@ writeOGR(cleanpoints.utm, paste0(gisDir,'/cleanData_duplicatesRemoved'),
 rm(points, dupes, dupvec, rowsOfInterest, dupePoints, dupedf, reduced, singlePoints, check, cleanpoints, cleanpoints.utm)
 ```
 
-### Re-make All_PointsWithShoreline shapefile
+Now check for duplicates in the shore points
 
-```{r allPointsShoreline}
+```{r cleanShore, eval=FALSE}
 # load shoreline points
 gisDir <- 'S:/Projects/2013/Higgins_Lake/Higgins_Bath/GIS'
 shorepoints <- readOGR(gisDir,"Shoreline_Points_GCS", verbose=F)
 
-# load clean data
-gisCleanDir <- 'S:/Projects/2013/Higgins_Lake/Higgins_Bath/GIS/cleanData_duplicatesRemoved'
-points <- readOGR(gisCleanDir,"Kayak_UM_MSU_2014_noDupes_utm", verbose=F)
-
-names(shorepoints)
-names(points)
-proj4string(shorepoints)
-proj4string(points)
-
 # match column names between shore points and data points
 shorepoints <- shorepoints[,c('Lat','Lon','Bot_Ele','Id')]
-newnames <- c('Lat','Lon','Bot_Ele','ID')
-names(shorepoints) <- newnames
-
-#add shore depth and combine shoreline to points
+names(shorepoints) <- c('Lat','Lon','Bot_Ele','ID')
+#add shore depth 
 shorepoints$lakedepth <- 0
-allpoints <- spRbind(points, shorepoints)
-points <- spTransform(points, CRS(utmproj))
-
-# reproject to meters
+# reproject
 utmproj <- '+proj=utm +zone=16 +ellps=GRS80 +datum=NAD83 +units=m +no_defs' 
-allpoints <- spTransform(allpoints, CRS(utmproj))
+shorepoints <- spTransform(shorepoints, CRS(utmproj))
 
-# write out Shapefile
-writeOGR(allpoints,"../GIS","All_PointsWithShoreline", driver= "ESRI Shapefile")
-
-```
-
---------------------------------------------------------
-
-```{r}
-# load points
-gisDir <- 'S:/Projects/2013/Higgins_Lake/Higgins_Bath/GIS'
-allpoints <- readOGR(gisDir,"All_PointsWithShoreline", verbose=F)
-
-dupes <- zerodist(allpoints)             # check for points on top of each other
+dupes <- zerodist(shorepoints)
 dupvec <- c(dupes[,1],dupes[,2])         # make a vector
 rowsOfInterest <- unique(dupvec)
 
 # extract duplicated coords and aggregate by coordinate (take mean)
-dupePoints <- as.data.frame(allpoints[rowsOfInterest,]) # subset duplicated points
-dupePoints$utm.x <- as.factor(dupePoints$utm.x)
-reduced <-aggregate(dupePointes, by=list(utm.x), FUN=mean, na.rm=TRUE)
-reduced <- aggregate(Bot_Ele ~ utm.x, data=dupePoints,FUN=mean)
+dupePoints <- shorepoints[rowsOfInterest,] # subset duplicated points
+# make a factor that incorporates x,y coords
+dupePoints$location <- as.factor(paste0(dupePoints$Lat,dupePoints$Lon)) 
+# get Bot_Ele mean for each location
+dupedf <- as.data.frame(dupePoints)
+reduced <-aggregate(dupedf, by=list(dupedf$location), FUN=mean, na.rm=TRUE)
+# clean and spatialize
+coordinates(reduced) <- ~coords.x1+coords.x2
+reduced <- reduced[,-c(1,7)]
 
+# combine reduced point dataset with original data singletons 
 # remove dupes from original data
-singlePoints <- allpoints[!rowsOfInterest,])
+singlePoints <- shorepoints[-rowsOfInterest,]
+proj4string(reduced) <- proj4string(singlePoints)
+cleanpoints <- spRbind(shorepoints,reduced)
 
+# write a utm file
+writeOGR(cleanpoints, paste0(gisDir,'/cleanData_duplicatesRemoved'), 
+         "Shoreline_Points_noDupes_utm", driver = 'ESRI Shapefile')
+
+# tidy up
+rm(dupes, dupvec, rowsOfInterest, dupePoints, dupedf, reduced, singlePoints, cleanpoints, shorepoints, utmproj)
+```
+
+
+### Re-make All_PointsWithShoreline shapefile
+
+```{r allPointsShoreline, eval=FALSE}
+# load files
+gisCleanDir <- 'S:/Projects/2013/Higgins_Lake/Higgins_Bath/GIS/cleanData_duplicatesRemoved'
+# load shoreline points
+shorepoints <- readOGR(gisCleanDir,"Shoreline_Points_noDupes_utm", verbose=F)
+# load all clean data
+points <- readOGR(gisCleanDir,"Kayak_UM_MSU_2014_noDupes_utm", verbose=F)
+
+# combine shoreline with points
+allpoints <- spRbind(points, shorepoints)
+
+# write out Shapefile
+writeOGR(allpoints,gisCleanDir,"AllPoints_withShoreline_utm", driver= "ESRI Shapefile")
+
+#tidy up
+rm(allpoints, points, shorepoints)
+```
+
+## Shallow Depths Only Datasets
+Presumably, the Kayaking shapefile also has duplicates, and possibly the shoal file. 
+
+### Check and Clean Duplicates
+
+```{r shoal}
+# load points
+gisDir <- 'S:/Projects/2013/Higgins_Lake/Higgins_Bath/GIS'
+shoal_shore <- readOGR(gisDir,"Corrected_Elev_Merged_Shoal_and_Shore2", verbose=F)
+
+# match names to All Points dataset
+shoal_shore <- shoal_shore[,c('Lat', 'Lon','Bot_Ele')]
+shoal_shore$ID <- 0
+
+# reproject to utm
+utmproj <- '+proj=utm +zone=16 +ellps=GRS80 +datum=NAD83 +units=m +no_defs' 
+shoal_shore <- spTransform(shoal_shore, CRS(utmproj))
+
+dupes <- zerodist(shoal_shore)           # check for points on top of each other
+dupvec <- c(dupes[,1],dupes[,2])         # make a vector
+rowsOfInterest <- unique(dupvec)
+
+# extract duplicated coords and aggregate by coordinate (take mean)
+dupePoints <- shoal_shore[rowsOfInterest,] # subset duplicated points
+# make a factor that incorporates x,y coords
+dupePoints$location <- as.factor(paste0(dupePoints$Lat,dupePoints$Lon)) 
+# get Bot_Ele mean for each location
+dupedf <- as.data.frame(dupePoints)
+reduced <-aggregate(dupedf, by=list(dupedf$location), FUN=mean, na.rm=TRUE)
+# clean and spatialize
+coordinates(reduced) <- ~coords.x1+coords.x2
+reduced <- reduced[,-c(1,6)]
+
+# combine reduced point dataset with original data singletons 
+# remove dupes from original data
+singlePoints <- shoal_shore[-rowsOfInterest,]
+proj4string(reduced) <- proj4string(singlePoints)
+cleanpoints <- spRbind(shoal_shore,reduced)
+
+# make lake depth (m) using elevation of shoreline
+cleanpoints$lakedepth <- 351.733 - cleanpoints$Bot_Ele
+
+# write a utm file
+writeOGR(cleanpoints, paste0(gisDir,'/cleanData_duplicatesRemoved'), 
+         "Corrected_Elev_Merged_Shoal_and_Shore2_noDupes_utm", 
+         driver = 'ESRI Shapefile')
+
+# tidy up
+rm(points, dupes, dupvec, rowsOfInterest, dupePoints, dupedf, reduced, singlePoints, check, cleanpoints, shoal_shore, utmproj)
+```
+
+
+```{r kayak}
+# load points
+gisDir <- 'S:/Projects/2013/Higgins_Lake/Higgins_Bath/GIS'
+kayak <- readOGR(gisDir,"Kayaked2014", verbose=F)
+
+# match names to All Points dataset
+kayak$ID <- 0
+
+# reproject to utm
+utmproj <- '+proj=utm +zone=16 +ellps=GRS80 +datum=NAD83 +units=m +no_defs' 
+kayak <- spTransform(kayak, CRS(utmproj))
+
+dupes <- zerodist(kayak)             # check for points on top of each other
+dupvec <- c(dupes[,1],dupes[,2])         # make a vector
+rowsOfInterest <- unique(dupvec)
+
+# extract duplicated coords and aggregate by coordinate (take mean)
+dupePoints <- kayak[rowsOfInterest,] # subset duplicated points
+# make a factor that incorporates x,y coords
+dupePoints$location <- as.factor(paste0(dupePoints$Lat,dupePoints$Lon)) 
+# get Bot_Ele mean for each location
+dupedf <- as.data.frame(dupePoints)
+reduced <-aggregate(dupedf, by=list(dupedf$location), FUN=mean, na.rm=TRUE)
+# clean and spatialize
+coordinates(reduced) <- ~coords.x1+coords.x2
+reduced <- reduced[,-c(1,6)]
+
+# combine reduced point dataset with original data singletons 
+# remove dupes from original data
+singlePoints <- kayak[-rowsOfInterest,]
+proj4string(reduced) <- proj4string(singlePoints)
+cleanpoints <- spRbind(singlePoints,reduced)
+
+# make lake depth (m) using elevation of shoreline
+cleanpoints$lakedepth <- 351.733 - cleanpoints$Bot_Ele
+
+writeOGR(cleanpoints, paste0(gisDir,'/cleanData_duplicatesRemoved'), 
+         "Kayaked2014__noDupes_utm", driver = 'ESRI Shapefile')
+
+# tidy up
+rm(dupes, dupvec, rowsOfInterest, dupePoints, dupedf, reduced, singlePoints, cleanpoints, kayak, utmproj)
+```
+
+### Combine clean points
+Make (1) file that combines shoal and kayak, and (2) file that combined shoal, kayak, and shoreline points
+
+
+```{r combineShallow, eval=FALSE}
+# load clean data
+gisCleanDir <- 'S:/Projects/2013/Higgins_Lake/Higgins_Bath/GIS/cleanData_duplicatesRemoved'
+kayak <- readOGR(gisCleanDir,"Kayaked2014__noDupes_utm", verbose=F)
+shoal <- readOGR(gisCleanDir,"Corrected_Elev_Merged_Shoal_and_Shore2_noDupes_utm", verbose=F)
+shore <- readOGR(gisCleanDir, "Shoreline_Points_noDupes_utm", verbose=F)
+
+# combine shoreline with points
+shallowdata <- spRbind(kayak, shoal)
+shallowshore <- spRbind(shallowdata, shore)
+
+writeOGR(shallowdata, gisCleanDir, 'Shoal_Kayak_utm', driver='ESRI Shapefile')
+writeOGR(shallowshore, gisCleanDir, 'allShallow_shore_utm', driver='ESRI Shapefile')
 ```
