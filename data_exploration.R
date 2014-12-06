@@ -46,7 +46,7 @@ grid.text('Lake Depth (m)',x=unit(0.965, "npc"),y=unit(0.5, 'npc'), rot=-90)
 
 
 #Load data with shoreline points------------------------------------------------
-shorepoints <- readOGR("../GIS/cleanData_duplicatesRemoved",
+allpoints <- readOGR("../GIS/cleanData_duplicatesRemoved",
                        "AllPoints_withShoreline_utm")
 
 
