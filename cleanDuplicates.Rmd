@@ -117,7 +117,9 @@ reduced <- reduced[,-c(1,7)]
 # remove dupes from original data
 singlePoints <- shorepoints[-rowsOfInterest,]
 proj4string(reduced) <- proj4string(singlePoints)
-cleanpoints <- spRbind(shorepoints,reduced)
+cleanpoints <- spRbind(singlePoints,reduced)
+
+#dupeCheck <- zerodist(cleanpoints)
 
 # write a utm file
 writeOGR(cleanpoints, paste0(gisDir,'/cleanData_duplicatesRemoved'), 
@@ -185,7 +187,7 @@ reduced <- reduced[,-c(1,6)]
 # remove dupes from original data
 singlePoints <- shoal_shore[-rowsOfInterest,]
 proj4string(reduced) <- proj4string(singlePoints)
-cleanpoints <- spRbind(shoal_shore,reduced)
+cleanpoints <- spRbind(singlePoints,reduced)
 
 # make lake depth (m) using elevation of shoreline
 cleanpoints$lakedepth <- 351.733 - cleanpoints$Bot_Ele
@@ -257,6 +259,11 @@ shore <- readOGR(gisCleanDir, "Shoreline_Points_noDupes_utm", verbose=F)
 # combine shoreline with points
 shallowdata <- spRbind(kayak, shoal)
 shallowshore <- spRbind(shallowdata, shore)
+
+checkDupes  <- zerodist(shallowdata)
+checkDupes2 <- zerodist(shallowshore) # two points didn't pass, remove one
+shallowshore <- shallowshore[-98222,]
+checkDupes3 <- zerodist(shallowshore)
 
 writeOGR(shallowdata, gisCleanDir, 'Shoal_Kayak_utm', driver='ESRI Shapefile')
 writeOGR(shallowshore, gisCleanDir, 'allShallow_shore_utm', driver='ESRI Shapefile')
