@@ -5,3 +5,53 @@ date: "Monday, December 08, 2014"
 output: html_document
 ---
 
+```{r knitrOpts, echo=FALSE}
+library(knitr)
+opts_chunk$set(cache=TRUE)
+opts_chunk$set(echo=TRUE)
+opts_chunk$set(fig.path='figures/lakeLevels/')
+opts_chunk$set(cache.path='cache/lakeLevels/')
+```
+
+**R Packages Needed*
+
+```{r packages, message=FALSE, echo=TRUE}
+library(rgdal)
+library(raster)
+```
+
+## Code Development
+I'm developing code using the IDW 5 m raster product, so that the code will be ready once the kriging output is finalized. The IDW raster was created in `makeGrids_IDW.Rmd`
+
+According to Sherry and Anthony, the maximum drop if the dam is removed is 18 inches.
+
+```{r idw}
+# load idw output
+rdatadir <- 'S:/Projects/2013/Higgins_Lake/Higgins_Bath/KrigingProject/Higgins_Code/RData_Objects/IDWvolume/'
+load(paste0(rdatadir,'IDW_rasters.Rdata'))
+# convert depth back to meters above sea level
+lakebot <- (depthras5*-1) + 351.733
+
+# load lake shapefile
+polydir <- 'S:/Projects/2013/Higgins_Lake/Higgins_Bath/GIS/lakePolys'
+lakepoly <- readOGR(polydir, 'FinalLakePoly', verbose=F)
+
+plot(lakebot, main = '5m IDW Lake Depth')
+plot(lake, add=T)
+
+# make a "lake-level" raster
+laketop <- depthras5
+laketop[!is.na(laketop)] <- 351.733  # lake surface at time of sampling
+
+# calculate lake volume and area -----------------------------------------------
+# make an output data frame, for lake drops between 0 and 1 meter
+lakeSummary <- data.frame(lakeDrop.m = sort(c(seq(0,1,length.out=11),0.457,
+                                              5,10,)),
+                          lakeArea.m2 = NA,
+                          lakeVol.m3 = NA)
+# calculate statistics for each depth increment
+
+lakeVol <- cellStats(((laketop - lakebot) * 5 * 5), sum, na.rm=T)  
+lakeArea <- cellStats(lakebot < 352, sum, na.rm=T) * 5 * 5
+```
+
