@@ -21,6 +21,7 @@ opts_chunk$set(cache.path='cache/IDW/')
 library(rgdal)
 library(gstat)
 library(rgeos)
+library(raster)
 ```
 
 ## Make Interpolation Grids
@@ -219,18 +220,34 @@ save(grid3m, file=paste0(rdataDir,'Grid3m.RData'))
 ```{r IDW}
 # load grid
 rdataDir <- 'S:/Projects/2013/Higgins_Lake/Higgins_Bath/KrigingProject/Higgins_Code/RData_Objects/'
+load(paste0(rdataDir,'Grid5m.RData'))
 load(paste0(rdataDir,'Grid10m.RData'))
 
 # load points
-gisDir <- 'S:/Projects/2013/Higgins_Lake/Higgins_Bath/GIS'
-allpoints <- readOGR(gisDir,"All_PointsWithShoreline", verbose=F)
+gisDir <- 'S:/Projects/2013/Higgins_Lake/Higgins_Bath/GIS/cleanData_duplicatesRemoved'
+allpoints <- readOGR(gisDir,"AllPoints_withShoreline_utm", verbose=F)
 
 # IDW: k = 2, npts = 8
 idw10m <- idw(lakedepth ~ 1, allpoints, newdata = grid10m, 
                   idp = 2, nmax = 8)
 
+idw5m <- idw(lakedepth ~ 1, allpoints, newdata = grid5m, 
+                  idp = 2, nmax = 8)
+
+# plot it
 lakePal <- colorRampPalette(c('midnightblue','turquoise1'))
 spplot(idw10m, 'var1.pred', col.regions = rev(lakePal(200)),
-       main = 'IDW: k = 2, npts = 8')
+       main = 'IDW: k = 2, npts = 8, 10m res')
+
+spplot(idw5m, 'var1.pred', col.regions = rev(lakePal(200)),
+       main = 'IDW: k = 2, npts = 8, 5m res')
+
+# rasterize
+depthras10 <- raster(idw10m[,'var1.pred'])
+depthras5 <- raster(idw5m[,'var1.pred'])
+
+# save as RData
+subdir <- 'IDWvolume/'
+save(depthras10, depthras5, file=paste0(rdataDir,subdir,'IDW_rasters.Rdata'))
 ```
 
