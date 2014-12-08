@@ -10,21 +10,16 @@ output:
 ```{r knitrOpts, echo=FALSE}
 library(knitr)
 opts_chunk$set(cache=TRUE)
-opts_chunk$set(echo=TRUE)
+opts_chunk$set(echo=TRUE, eval=FALSE)
 opts_chunk$set(fig.path='figures/cleanpoints/')
 opts_chunk$set(cache.path='cache/cleanpoints/')
 ```
 
 ## Overview
-**Problem:** our point dataset has ~80,000 co-located points (ended up being 41,461 extra points)
-**Goal:** Aggregate all co-located points into one point with a mean lake depth value.
+**Problem:** our point dataset has ~80,000 co-located points (ended up being 41,461 extra points)  
+**Goal:** Aggregate all co-located points into one point with a mean lake depth value.  
 **Output:** Cleaned point datasets for analysis, including various point subsets
 
-We have made several point datasets thus far (different combinations of deep depths, shallow depths, and shoreline points), so I am going to start by cleaning Blaze's master 'Kayak_UM_MSU_2014.shp', which has combined deep depths and shallow points.
-
-We can then use this base copy to re-run code that produces the "All_PointsWithShoreline.shp" shapefile (aka, by fixing the source, we can fix all the products).
-
-Kayla also combined a few datasets into two shallow depth datasets (in case we krige by shelf/deep lake areas) using files that Blaze incorporated into Kayak_UM_MSU_2014.shp, so I will also check those input files for duplicates.
 
 **R Packages Needed*
 
@@ -142,6 +137,10 @@ points <- readOGR(gisCleanDir,"Kayak_UM_MSU_2014_noDupes_utm", verbose=F)
 
 # combine shoreline with points
 allpoints <- spRbind(points, shorepoints)
+
+# retest for duplicates
+dupeTest <- zerodist(allpointsClean)
+allpoints <- allpoints[-525433,]
 
 # write out Shapefile
 writeOGR(allpoints,gisCleanDir,"AllPoints_withShoreline_utm", driver= "ESRI Shapefile")
@@ -268,3 +267,56 @@ checkDupes3 <- zerodist(shallowshore)
 writeOGR(shallowdata, gisCleanDir, 'Shoal_Kayak_utm', driver='ESRI Shapefile')
 writeOGR(shallowshore, gisCleanDir, 'allShallow_shore_utm', driver='ESRI Shapefile')
 ```
+
+
+## Deep Depths Only Datasets
+
+```{r deepclean}
+# load points
+gisDir <- 'S:/Projects/2013/Higgins_Lake/Higgins_Bath/GIS'
+deep <- readOGR(gisDir,"Compiled_UM_Data", verbose=F)
+
+# match names to All Points dataset
+deep <- deep[,c('Lat','Lon','Bot_Ele', 'ID')]
+
+# remove point with 0,0 lat/long
+head(deep@data[order(deep$Lat),])
+deep <- deep[-155427,]
+
+# fix utm projection order
+utmproj <- '+proj=utm +zone=16 +ellps=GRS80 +datum=NAD83 +units=m +no_defs' 
+proj4string(deep) <- utmproj
+
+dupes <- zerodist(deep)             # check for points on top of each other
+dupvec <- c(dupes[,1],dupes[,2])         # make a vector
+rowsOfInterest <- unique(dupvec)
+
+# extract duplicated coords and aggregate by coordinate (take mean)
+dupePoints <- deep[rowsOfInterest,] # subset duplicated points
+# make a factor that incorporates x,y coords
+dupePoints$location <- as.factor(paste0(dupePoints$Lat,dupePoints$Lon)) 
+# get Bot_Ele mean for each location
+dupedf <- as.data.frame(dupePoints)
+reduced <-aggregate(dupedf, by=list(dupedf$location), FUN=mean, na.rm=TRUE)
+# clean and spatialize
+coordinates(reduced) <- ~coords.x1+coords.x2
+reduced <- reduced[,-c(1,6)]
+
+# combine reduced point dataset with original data singletons 
+# remove dupes from original data
+singlePoints <- deep[-rowsOfInterest,]
+proj4string(reduced) <- proj4string(singlePoints)
+cleanpoints <- spRbind(singlePoints,reduced)
+
+# make lake depth (m) using elevation of shoreline
+cleanpoints$lakedepth <- 351.733 - cleanpoints$Bot_Ele
+
+#test <- zerodist(cleanpoints)
+
+writeOGR(cleanpoints, paste0(gisDir,'/cleanData_duplicatesRemoved'), 
+         "Compiled_UM_Data__noDupes_utm", driver = 'ESRI Shapefile')
+
+# tidy up
+rm(dupes, dupvec, rowsOfInterest, dupePoints, dupedf, reduced, singlePoints, cleanpoints, deep, utmproj)
+```
+
