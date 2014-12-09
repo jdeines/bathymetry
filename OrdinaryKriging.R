@@ -6,7 +6,7 @@ library(rgdal)
 library(grid)
 library(gstat)
 library(maptools)
-
+library(raster)
 
 
 
@@ -15,23 +15,8 @@ library(maptools)
 gisCleanDir <- 'S:/Projects/2013/Higgins_Lake/Higgins_Bath/GIS/cleanData_duplicatesRemoved'
 allpointsClean <- readOGR(gisCleanDir,"AllPoints_withShoreline_utm")
 
-# Jill's quick 10 m test ---------------------------------------
-Rdatadirectory <- 'S:/Projects/2013/Higgins_Lake/Higgins_Bath/KrigingProject/Higgins_Code/RData_Objects/'
-load(paste0(Rdatadirectory, 'Grid10m.RData'))
-load(paste0(Rdatadirectory, 'data_exploration.RData'))
-ok.krige <- krige(lakedepth~1, allpointsClean, grid10m, model=vgm.10000, nmax=8)
-
-# plot it!
-lakePal <- colorRampPalette(c('midnightblue','turquoise1'))
-spplot(ok.krige, 'var1.pred', col.regions=rev(lakePal(200)))
-# Ordinary Kriging ------------------------------------------------------------------
-
-# try kriging with all points
-Rdatadirectory <- 'S:/Projects/2013/Higgins_Lake/Higgins_Bath/KrigingProject/Higgins_Code/RData_Objects/'
-load(paste0(Rdatadirectory, 'Grid3m.RData'))
-load(paste0(Rdatadirectory, 'data_exploration.RData'))
-#proj4string(grid10m) <- proj4string(allpointsClean)
-ok.krige <- krige(lakedepth~1, allpointsClean, grid3m, model=vgm.10000, nmax=8)
+points <- readOGR("../GIS/cleanData_duplicatesRemoved",
+                  "Kayak_UM_MSU_2014_noDupes_utm")
 
 #Random Sampling------------------------------------------------------
 
@@ -65,9 +50,69 @@ coordinates(Normalpoints) <- ~coords.x1+coords.x2             # re-spatialize
 utmproj <- '+proj=utm +zone=16 +ellps=GRS80 +datum=NAD83 +units=m +no_defs' #give it the right projection
 proj4string(Normalpoints) <- utmproj
 
+#Krige Normal Data----------------
 
+#Ordinary Krige
 Rdatadirectory <- 'S:/Projects/2013/Higgins_Lake/Higgins_Bath/KrigingProject/Higgins_Code/RData_Objects/'
 load(paste0(Rdatadirectory, 'Grid5m.RData'))
 load(paste0(Rdatadirectory, 'data_exploration.RData'))
 load(paste0(Rdatadirectory, 'ns_vgm10000.RData'))
+proj4string(grid5m) <- proj4string(Normalpoints) #making the coordinate systems match 
 ok.krige <- krige(nscore~1, Normalpoints, grid5m, model=Normalvgm.10000, nmax=16)
+
+#plot ordinary krige
+lakePal <- colorRampPalette(c('midnightblue','turquoise1'))
+spplot(ok.krige, 'var1.pred', col.regions=rev(lakePal(200)), main ="Ordinary Kriging")
+save(ok.krige, file=paste0(Rdatadirectory, 'ok.krige16.Rdata'))
+
+#change to raster
+okRaster <- raster(ok.krige[,'var1.pred'])
+
+#save raster
+Rdatadirectory <- 'S:/Projects/2013/Higgins_Lake/Higgins_Bath/KrigingProject/Higgins_Code/RData_Objects/'
+save(okRaster, file=paste0(Rdatadirectory,'okRaster.RData'))
+
+#Simulation Krige
+load(paste0(Rdatadirectory, 'Grid10m.RData'))
+proj4string(grid10m) <- proj4string(Normalpoints) #making the coordinate systems match 
+ok.sim <- krige(nscore~1, Normalpoints, grid10m, model=Normalvgm.10000, nmax=16, nsim=20)
+
+#plot simulation krige
+#spplot(ok.sim, 'var1.pred', col.regions=rev(lakePal(200)), main ="Simulation Kriging")
+
+#Make the model output grid
+ok.sim.sp <- grid5m
+#slot(ok.sim.sp, "data") <- ok.sim
+
+#Create an average map for simulation results
+ok.sim.sp$avg <- rowMeans(ok.sim, dims=1)
+spplot(ok.sim.sp, "avg", sp.layout = list(pts,border,jth), col.regions=ca.cols(20),
+             main=paste(me,"Joshua Tree habitat from simulation average", sep=" - "))
+
+# Make the model output spatial
+#h.sims.sp <- ca.grid
+#slot(h.sims.sp, "data") <- habitat.sims
+
+# Create an average map for all simulation results
+#h.sims.sp$avg <- rowMeans(habitat.sims, dims=1)
+#spplot(h.sims.sp, "avg", col.regions=rev(lakePal(200)), main = "Simulation Kriging Average")
+    
+
+#USING OLD VARIABLES
+# Jill's quick 10 m test ---------------------------------------
+Rdatadirectory <- 'S:/Projects/2013/Higgins_Lake/Higgins_Bath/KrigingProject/Higgins_Code/RData_Objects/'
+load(paste0(Rdatadirectory, 'Grid10m.RData'))
+#load(paste0(Rdatadirectory, 'data_exploration.RData'))
+ok.krige <- krige(lakedepth~1, allpointsClean, grid10m, model=vgm.10000, nmax=8)
+
+# plot it!
+lakePal <- colorRampPalette(c('midnightblue','turquoise1'))
+spplot(ok.krige, 'var1.pred', col.regions=rev(lakePal(200)))
+# Ordinary Kriging ------------------------------------------------------------------
+
+# try kriging with all points
+Rdatadirectory <- 'S:/Projects/2013/Higgins_Lake/Higgins_Bath/KrigingProject/Higgins_Code/RData_Objects/'
+load(paste0(Rdatadirectory, 'Grid3m.RData'))
+load(paste0(Rdatadirectory, 'data_exploration.RData'))
+#proj4string(grid10m) <- proj4string(allpointsClean)
+ok.krige <- krige(lakedepth~1, allpointsClean, grid3m, model=vgm.10000, nmax=8)
