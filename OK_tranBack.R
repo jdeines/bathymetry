@@ -11,65 +11,40 @@ load("./Higgins_Code/RData_Objects/Normalpoints.RData")
 load("./Higgins_Code/RData_Objects/ok.krige16.RData")
 FinalLakePoly <- readOGR("S:/Projects/2013/Higgins_Lake/Higgins_Bath/GIS/lakePolys", "FinalLakePoly")
 
-# Transform back normal scores function from Ashton's lecture--------------------------------------------
-#modified function from AS #nscore_examples.R from Nov 18th lecture
-# this one also take the spdf as input
-# instead of the nscore object output
-
-
-#Transforms to Normal Scores-------------------------------------------
-
-
-
-ns.backtr <- function(scores, nscore, tails='none', draw=TRUE) {
-  if(tails=='separate') { 
-    mean.x <- mean(nscore$x)
-    small.x <- nscore$x < mean.x
-    large.x <- nscore$x > mean.x
-    small.sd <- sqrt(sum((nscore$x[small.x]-mean.x)^2)/
-                       (length(nscore$x[small.x])-1))
-    large.sd <- sqrt(sum((nscore$x[large.x]-mean.x)^2)/
-                       (length(nscore$x[large.x])-1))
-    min.x <- mean(nscore$x) + (min(scores) * small.sd)
-    max.x <- mean(nscore$x) + (max(scores) * large.sd)
-    # check to see if these values are LESS extreme than the
-    # initial data - if so, use the initial data.
-    #print(paste('lg.sd is:',large.sd,'max.x is:',max.x,'max nsc.x is:',max(nscore$trn.table$x)))
-    if(min.x > min(nscore$x)) {min.x <- min(nscore$x)}
-    if(max.x < max(nscore$x)) {max.x <- max(nscore$x)}
-  }
-  if(tails=='none') {   # No extrapolation
-    min.x <- min(nscore$x)
-    max.x <- max(nscore$x)
-  }
-  min.sc <- min(scores)
-  max.sc <- max(scores)
-  x <- c(min.x, nscore$x, max.x)
-  nsc <- c(min.sc, nscore$nscore, max.sc)
-  
-  if(draw) {plot(nsc,x, main='Transform Function')}
-  back.xf <- approxfun(nsc,x) # Develop the back transform function
-  val <- back.xf(scores)
-  return(val)
-}
-
 # Tranform OK back-----------------------------------------------------------------------------------------------
 ok.pred16 <- ns.backtr(ok.krige$var1.pred, Normalpoints, tails='none')
 ok.krige$bk_pred <- ok.pred16
-#ok.krige@data[ok.krige$bk_pred < 0,]$ bk_pred <- 0
-ok.var16 <- ns.backtr(ok.krige$var1.var, Normalpoints, tails='none')
-ok.krige$bk_var <- ok.var16
+#ok.var16 <- ns.backtr(ok.krige$var1.var, Normalpoints, tails='none')
+#ok.krige$bk_var <- ok.var16
 
+#ok.krige$var1.stan_error <- sqrt(ok.krige$var1.var)
+#ok.stan_error <- ns.backtr(ok.krige$var1.stan_error, Normalpoints, tails='none')
+#ok.krige$bk_var.stan_error <- ok.stan_error^2
+#ok.krige$stan_error <- ok.stan_error
 # Plot Back_OK---------------------------------------------------------------------------------------------------
-# Plot data points
-lakePal <- colorRampPalette(c('midnightblue','turquoise1'))
-pts <- list('sp.points', Normalpoint, pch=1, cex=0.7, col='gray30')
 
+lakePal <- colorRampPalette(c('midnightblue','turquoise1'))
+# plot ok prediction
+png('figures/LakeDepth_OK16.png', type = "cairo", units = "in", width = 4.5, height = 4, res = 300)
 spplot(ok.krige['bk_pred'], col.regions=rev(lakePal(200)), 
        scales=list(draw = TRUE), main="Higgins Lake Depth OK Predictions") +
 layer(sp.polygons(FinalLakePoly, col='black'))
+dev.off()
+save(ok.krige['bk_pred'], file=paste0(RdataOutputs,'okRasterbt.Rdata'))
 
-spplot(ok.krige['bk_var'], col.regions=heat.colors(200), 
+# plot ok variance
+png('figures/LakeDepth_OK_var16.png', type = "cairo", units = "in", width = 4.5, height = 4, res = 300)
+spplot(ok.krige['var1.var'], col.regions=heat.colors(20), 
        scales=list(draw = TRUE), main="Higgins Lake Depth OK Variance") +
 layer(sp.polygons(FinalLakePoly, col='black'))
+dev.off()
+save(ok.krige, file="./Higgins_Code/RData_Objects/ok.tran_bk.Rdata")
 
+#Note: under "names(ok.krige)" bk_var is transformed back
+#change ok.krige to raster
+ok.bt.Raster <- raster(ok.krige[,'bk_pred'])
+spplot(ok.bt.Raster, col.regions=rev(lakePal(200)), main= "Ordinary Kriging")
+Rdatadirectory <- 'S:/Projects/2013/Higgins_Lake/Higgins_Bath/KrigingProject/Higgins_Code/RData_Objects/'
+save(ok.bt.Raster, file=paste0(Rdatadirectory,'ok.bt.Raster.Rdata'))
+
+save(okRaster, file=paste0(RdataOutputs,'okRaster.Rdata'))
