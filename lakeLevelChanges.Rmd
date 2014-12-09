@@ -9,7 +9,7 @@ output: html_document
 library(knitr)
 opts_chunk$set(cache=TRUE)
 opts_chunk$set(echo=TRUE)
-opts_chunk$set(fig.path='figures/lakeLevels/')
+opts_chunk$set(fig.path='figures/lakeLevels/IDW/')
 opts_chunk$set(cache.path='cache/lakeLevels/')
 ```
 
@@ -25,19 +25,17 @@ I'm developing code using the IDW 5 m raster product, so that the code will be r
 
 According to Sherry and Anthony, the maximum drop if the dam is removed is 18 inches.
 
-```{r idw}
+```{r idwDepthCalcs}
 # load idw output
-rdatadir <- 'S:/Projects/2013/Higgins_Lake/Higgins_Bath/KrigingProject/Higgins_Code/RData_Objects/IDWvolume/'
+rdatadir <- 'S:/Projects/2013/Higgins_Lake/Higgins_Bath/KrigingProject/Higgins_Code/RData_Objects/Outputs/'
 load(paste0(rdatadir,'IDW_rasters.Rdata'))
+
 # convert depth back to meters above sea level
 lakebot <- (depthras5*-1) + 351.733
 
 # load lake shapefile
 polydir <- 'S:/Projects/2013/Higgins_Lake/Higgins_Bath/GIS/lakePolys'
 lakepoly <- readOGR(polydir, 'FinalLakePoly', verbose=F)
-
-plot(lakebot, main = '5m IDW Lake Depth')
-plot(lake, add=T)
 
 # make a "lake-level" raster
 laketop <- depthras5
@@ -46,12 +44,63 @@ laketop[!is.na(laketop)] <- 351.733  # lake surface at time of sampling
 # calculate lake volume and area -----------------------------------------------
 # make an output data frame, for lake drops between 0 and 1 meter
 lakeSummary <- data.frame(lakeDrop.m = sort(c(seq(0,1,length.out=11),0.457,
-                                              5,10,)),
+                                              1.5,2,3,4,5,10,15,20,25,30,35,40)),
                           lakeArea.m2 = NA,
-                          lakeVol.m3 = NA)
-# calculate statistics for each depth increment
+                          changeArea = NA,
+                          lakeVol.m3 = NA,
+                          changeVol = NA)
+# color palette
+lakePal <- colorRampPalette(c('midnightblue','turquoise1'))
 
-lakeVol <- cellStats(((laketop - lakebot) * 5 * 5), sum, na.rm=T)  
-lakeArea <- cellStats(lakebot < 352, sum, na.rm=T) * 5 * 5
+# calculate statistics for each depth increment
+for (m in 1:nrow(lakeSummary)){            # for each depth decrease
+  # set new lake level raster
+  laketop2 <- laketop - lakeSummary$lakeDrop.m[m]
+  # find new lake depth (and active cells) raster
+  lakedepth <- laketop2 - lakebot
+  lakedepth[lakedepth < 0] <- NA
+  # calculate volume of water
+  lakeSummary[m,'lakeVol.m3'] <- cellStats((lakedepth * 5 * 5), 
+                                           sum, na.rm=T)  
+  # calculate lake area
+  lakeSummary[m,'lakeArea.m2'] <- cellStats(!is.na(lakedepth), sum, na.rm=T) * 5 * 5
+  
+  # calculate change in volume and area
+  if (m > 1) {
+    lakeSummary[m,'changeArea'] <- lakeSummary[m-1,'lakeArea.m2'] - 
+                                   lakeSummary[m,'lakeArea.m2']
+    lakeSummary[m,'changeVol'] <- lakeSummary[m-1,'lakeVol.m3'] - 
+                                  lakeSummary[m,'lakeVol.m3']
+  }
+  
+# #   plot it
+#   plot(lakedepth, main=paste0("Higgin's Lake: ",lakeSummary$lakeDrop.m[m]," m Drop \n",
+#                               "Volume: ",round(lakeSummary[m,'lakeVol.m3']),"  Area: ",
+#                               round(lakeSummary[m,'lakeArea.m2'])),
+#        col=rev(lakePal(9)), 
+#        breaks=seq(0,45,length.out=10))
+#   plot(lakepoly, add=T)
+}
+
+# check out output, write table to csv
+lakeSummary
+projOutputDir <- 'S:/Projects/2013/Higgins_Lake/Higgins_Bath/KrigingProject/Output'
+write.csv(lakeSummary, paste(projOutputDir, 'depthVolumeSummary_IDW.csv',sep='/'))
+
+
+# calculate a depth/volume curve
+par(mfrow=c(1,2), mar=c(5,4,4,1))
+# first, zoom in on depth of interest
+shallowSummary <- lakeSummary[lakeSummary$lakeDrop.m < 1.6,]
+plot(shallowSummary$lakeVol.m3/1000000, shallowSummary$lakeDrop.m, type='b', pch=19,
+     xlab="Volume: Million m^3", ylab='Lake Depth (m)', ylim=c(1.6,0),
+     main="Depth Declines of Interest")
+#abline(h=0.457, v=633.5,col='red')
+rect(xleft=-1, ybottom=2, xright=633.5, ytop=0.457, border='red')
+# whole lake
+plot(lakeSummary$lakeVol.m3/1000000, lakeSummary$lakeDrop.m, type='b', pch=19,
+     xlab="Volume: Million m^3", ylab='Lake Depth (m)', ylim=c(42,0),
+     main="Full Volumetric Curve")
+
 ```
 
