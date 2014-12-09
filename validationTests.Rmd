@@ -5,18 +5,48 @@ date: "Monday, December 08, 2014"
 output: html_document
 ---
 
-This is an R Markdown document. Markdown is a simple formatting syntax for authoring HTML, PDF, and MS Word documents. For more details on using R Markdown see <http://rmarkdown.rstudio.com>.
 
-When you click the **Knit** button a document will be generated that includes both content as well as the output of any embedded R code chunks within the document. You can embed an R code chunk like this:
-
-```{r}
-summary(cars)
+```{r knitrOpts, echo=FALSE}
+library(knitr)
+opts_chunk$set(cache=TRUE)
+opts_chunk$set(echo=TRUE)
+opts_chunk$set(fig.path='figures/valid/')
+opts_chunk$set(cache.path='cache/valid/')
 ```
 
-You can also embed plots, for example:
+**R Packages Needed*
 
-```{r, echo=FALSE}
-plot(cars)
+```{r packages, message=FALSE, echo=TRUE}
+library(rgdal)
+library(raster)
+library(hydroGOF)
 ```
 
-Note that the `echo = FALSE` parameter was added to the code chunk to prevent printing of the R code that generated the plot.
+
+## Code Development
+I'm developing code using the IDW 5 m raster product, so that the code will be ready once the kriging output is finalized. The IDW raster was created in `makeGrids_IDW.Rmd`, and the 5000 sample was created in ordinaryKriging.R
+
+```{r testIDWPoints}
+# load idw and sample points
+rdatadir <- 'S:/Projects/2013/Higgins_Lake/Higgins_Bath/KrigingProject/Higgins_Code/RData_Objects/IDWvolume/'
+load(paste0(rdatadir,'IDW_rasters.Rdata'))
+load(paste0(rdatadir,'validationPoints.Rdata'))
+
+# extract prediction value by point
+random5000$prediction <- extract(depthras5, random5000)
+
+# plot against a 1:1 line
+plot(random5000$lakedepth, random5000$prediction, 
+     main='Simulated vs Observed, IDW',
+     xlab='Observed',ylab='simulated', col='blue')
+abline(a=0,b=1)
+
+# calculate stats (goodness of fit tests)
+gof.results.idw <- gof(sim=random5000$prediction, obs=random5000$lakedepth)
+gofTable.idw <- data.frame(metric=rownames(gof.results)[c(1:4,16:17)],
+                       value=gof.results[c(1:4,16:17)])
+gofTable.idw
+```
+
+
+
