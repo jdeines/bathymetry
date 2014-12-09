@@ -28,7 +28,7 @@ I'm developing code using the IDW 5 m raster product, so that the code will be r
 
 ```{r testIDWPoints}
 # load idw and sample points
-rdatadir <- 'S:/Projects/2013/Higgins_Lake/Higgins_Bath/KrigingProject/Higgins_Code/RData_Objects/IDWvolume/'
+rdatadir <- 'S:/Projects/2013/Higgins_Lake/Higgins_Bath/KrigingProject/Higgins_Code/RData_Objects/Outputs/'
 load(paste0(rdatadir,'IDW_rasters.Rdata'))
 load(paste0(rdatadir,'validationPoints.Rdata'))
 
@@ -43,10 +43,65 @@ abline(a=0,b=1)
 
 # calculate stats (goodness of fit tests)
 gof.results.idw <- gof(sim=random5000$prediction, obs=random5000$lakedepth)
-gofTable.idw <- data.frame(metric=rownames(gof.results)[c(1:4,16:17)],
-                       value=gof.results[c(1:4,16:17)])
+gofTable.idw <- data.frame(metric=rownames(gof.results.idw)[c(1:4,16:17)],
+                       value=gof.results.idw[c(1:4,16:17)])
 gofTable.idw
 ```
+
+Ordinary kriging validation
+```{r}
+Rdatadirectory <- 'S:/Projects/2013/Higgins_Lake/Higgins_Bath/KrigingProject/Higgins_Code/RData_Objects/'
+load(paste0(Rdatadirectory, 'ok.bt.Raster.Rdata'))
+load(paste0(rdatadir,'validationPoints.Rdata'))
+
+# extract prediction value by point
+random5000$prediction <- extract(ok.bt.Raster, random5000)
+
+# plot against a 1:1 line
+plot(random5000$lakedepth, random5000$prediction, 
+     main='Simulated vs Observed, OK',
+     xlab='Observed',ylab='simulated', col='blue')
+abline(a=0,b=1)
+
+gof.results.ok <- gof(sim=random5000$prediction, obs=random5000$lakedepth)
+gofTable.ok <- data.frame(metric=rownames(gof.results.ok)[c(1:4,16:17)],
+                       value=gof.results.ok[c(1:4,16:17)])
+gofTable.ok
+
+```
+
+Simulation kriging validation
+```{r}
+Rdatadirectory <- 'S:/Projects/2013/Higgins_Lake/Higgins_Bath/KrigingProject/Higgins_Code/RData_Objects/'
+load(paste0(Rdatadirectory, 'sim.krige4.Rdata'))
+load(paste0(rdatadir,'validationPoints.Rdata'))
+
+# extract prediction value by point
+random5000$prediction <- extract(simMean, random5000)
+
+# plot against a 1:1 line
+plot(random5000$lakedepth, random5000$prediction, 
+     main='Simulated vs Observed, Simulation Kriging',
+     xlab='Observed',ylab='simulated', col='blue')
+abline(a=0,b=1)
+
+gof.results.sim <- gof(sim=random5000$prediction, obs=random5000$lakedepth)
+gofTable.sim <- data.frame(metric=rownames(gof.results.sim)[c(1:4,16:17)],
+                       value=gof.results.sim[c(1:4,16:17)])
+gofTable.ok
+```
+
+multiplot-Kriges
+```{r}
+allStack <- stack(simMean, ok.bt.Raster, depthras5)
+names(allStack) <- c('simulation', 'OK', 'IDW')
+lakePal <- colorRampPalette(c('midnightblue','turquoise1'))
+spplot(allStack, col.regions=rev(lakePal(200)))
+
+
+```
+
+
 
 
 
