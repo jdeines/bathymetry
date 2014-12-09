@@ -69,7 +69,7 @@ points_5000 <- points[Index_5000,]
 # fit variogram
 vario_5000 <- variogram(lakedepth ~ 1, points_5000)
 plot(vario_5000, col='black', main="Omnidirectional Variogram for 5000 points No Shoreline")
-vgm.5000 <- vgm(model="Sph", nugget=0, psill=120, range=2)
+vgm.5000 <- vgm(model="Sph", nugget=0, psill=120, range=1500)
 vgm.5000 <- fit.variogram(vario_5000,vgm.5000)
 # make plot
 png('figures/variogram5000.png', type = "cairo", units = "in", width = 4.5, height = 4, res = 300)
@@ -82,7 +82,7 @@ points_10000 <- points[Index_10000,]
 # fit variogram
 vario_10000 <- variogram(lakedepth ~ 1, points_10000)
 plot(vario_10000, col='black', main="Omnidirectional Variogram for 10000 points No Shoreline")
-vgm.10000 <- vgm(model="Sph", nugget=0, psill=120, range=2)
+vgm.10000 <- vgm(model="Sph", nugget=0, psill=120, range=1500)
 vgm.10000 <- fit.variogram(vario_10000,vgm.10000)
 # make plot
 png('figures/variogram10000.png', type = "cairo", units = "in", width = 4.5, height = 4, res = 300)
@@ -95,7 +95,7 @@ points_50000 <- points[Index_50000,]
 # fit variogram
 vario_50000 <- variogram(lakedepth ~ 1, points_50000)
 plot(vario_50000, col='black', main="Omnidirectional Variogram for 50000 points No Shoreline")
-vgm.50000 <- vgm(model="Sph", nugget=0, psill=120, range=2)
+vgm.50000 <- vgm(model="Sph", nugget=0, psill=120, range=1500)
 vgm.50000 <- fit.variogram(vario_50000,vgm.50000)
 # make plot
 png('figures/variogram50000.png', type = "cairo", units = "in", width = 4.5, height = 4, res = 300)
