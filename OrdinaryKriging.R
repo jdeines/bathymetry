@@ -23,11 +23,7 @@ points <- readOGR("../GIS/cleanData_duplicatesRemoved",
 #use "points" because that is the dataset without the shoreline
 points$ID <- c(1:nrow(points)) #assigning a number to each row via the ID field to allow for comparing
 random5000 <- points[sample(1:nrow(points), 5000, replace=FALSE),] #randomly sampled 5000 points from the "points" dataset
-everypoint <- points
-#y <- subset(everypoint, everypoint!="random5000")
-yes <- random5000$ID
-modelpoints <- points[!points$ID %in% yes, ] #points without the random 5000 points
-
+modelpoints <- points[!points$ID %in% random5000$ID, ] #points without the random 5000 points
 
 
 #Transforms to Normal Scores-------------------------------------------
@@ -44,7 +40,6 @@ proj4string(Normalpoints) <- utmproj
 #Ordinary Krige
 Rdatadirectory <- 'S:/Projects/2013/Higgins_Lake/Higgins_Bath/KrigingProject/Higgins_Code/RData_Objects/'
 load(paste0(Rdatadirectory, 'Grid5m.RData'))
-load(paste0(Rdatadirectory, 'data_exploration.RData'))
 load(paste0(Rdatadirectory, 'ns_vgm10000.RData'))
 proj4string(grid5m) <- proj4string(Normalpoints) #making the coordinate systems match 
 ok.krige <- krige(nscore~1, Normalpoints, grid5m, model=Normalvgm.10000, nmax=16)
@@ -62,47 +57,3 @@ spplot(okRaster, col.regions=rev(lakePal(200)), main= "Ordinary Kriging")
 RdataOutputs <- 'S:/Projects/2013/Higgins_Lake/Higgins_Bath/KrigingProject/Higgins_Code/RData_Objects/Outputs/'
 save(okRaster, file=paste0(RdataOutputs,'okRaster.Rdata'))
 
-#Simulation Krige
-load(paste0(Rdatadirectory, 'Grid10m.RData'))
-proj4string(grid10m) <- proj4string(Normalpoints) #making the coordinate systems match 
-ok.sim <- krige(nscore~1, Normalpoints, grid10m, model=Normalvgm.10000, nmax=16, nsim=20)
-
-#plot simulation krige
-#spplot(ok.sim, 'var1.pred', col.regions=rev(lakePal(200)), main ="Simulation Kriging")
-
-#Make the model output grid
-ok.sim.sp <- grid5m
-#slot(ok.sim.sp, "data") <- ok.sim
-
-#Create an average map for simulation results
-ok.sim.sp$avg <- rowMeans(ok.sim, dims=1)
-spplot(ok.sim.sp, "avg", sp.layout = list(pts,border,jth), col.regions=ca.cols(20),
-             main="simulation average")
-
-# Make the model output spatial
-#h.sims.sp <- ca.grid
-#slot(h.sims.sp, "data") <- habitat.sims
-
-# Create an average map for all simulation results
-#h.sims.sp$avg <- rowMeans(habitat.sims, dims=1)
-#spplot(h.sims.sp, "avg", col.regions=rev(lakePal(200)), main = "Simulation Kriging Average")
-    
-
-#USING OLD VARIABLES
-# Jill's quick 10 m test ---------------------------------------
-Rdatadirectory <- 'S:/Projects/2013/Higgins_Lake/Higgins_Bath/KrigingProject/Higgins_Code/RData_Objects/'
-load(paste0(Rdatadirectory, 'Grid10m.RData'))
-#load(paste0(Rdatadirectory, 'data_exploration.RData'))
-ok.krige <- krige(lakedepth~1, allpointsClean, grid10m, model=vgm.10000, nmax=8)
-
-# plot it!
-lakePal <- colorRampPalette(c('midnightblue','turquoise1'))
-spplot(ok.krige, 'var1.pred', col.regions=rev(lakePal(200)))
-# Ordinary Kriging ------------------------------------------------------------------
-
-# try kriging with all points
-Rdatadirectory <- 'S:/Projects/2013/Higgins_Lake/Higgins_Bath/KrigingProject/Higgins_Code/RData_Objects/'
-load(paste0(Rdatadirectory, 'Grid3m.RData'))
-load(paste0(Rdatadirectory, 'data_exploration.RData'))
-#proj4string(grid10m) <- proj4string(allpointsClean)
-ok.krige <- krige(lakedepth~1, allpointsClean, grid3m, model=vgm.10000, nmax=8)
