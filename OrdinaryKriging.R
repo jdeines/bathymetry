@@ -13,10 +13,7 @@ library(raster)
 #ORDINARY KRIGING-----------------------------------------------
 
 gisCleanDir <- 'S:/Projects/2013/Higgins_Lake/Higgins_Bath/GIS/cleanData_duplicatesRemoved'
-allpointsClean <- readOGR(gisCleanDir,"AllPoints_withShoreline_utm")
-
-points <- readOGR("../GIS/cleanData_duplicatesRemoved",
-                  "Kayak_UM_MSU_2014_noDupes_utm")
+points <- readOGR(gisCleanDir,"Kayak_UM_MSU_2014_noDupes_utm")
 
 #Random Sampling------------------------------------------------------
 
